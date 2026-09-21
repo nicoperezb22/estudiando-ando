@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 2 — Status codes</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="lesson-header">
+  <span class="eyebrow">Lección 2 · HTTP y APIs</span>
+  <h1>Status codes: leer la respuesta</h1>
+  <p class="subtitle">Cuando un HTTP Request node de n8n falla, lo primero que te muestra es un número de 3 dígitos. Ese número ya te dice de quién es el problema — antes de que abras nada más.</p>
+</header>
+
+<main>
+
+<p>En la <a href="0001-anatomia-de-una-http-request.html">Lección 1</a> vimos que toda response trae un <strong>status code</strong>. Hoy nos metemos ahí: qué significa cada rango, y por qué distinguirlos te ahorra horas de debugging mal enfocado.</p>
+
+<h2>La regla de oro: el primer dígito</h2>
+
+<p>No hace falta memorizar los ~60 códigos que existen. Con saber qué significa el primer dígito, ya podés triangular el 90% de los casos:</p>
+
+<table>
+  <tr><th>Rango</th><th>Significa</th></tr>
+  <tr><td><code>2xx</code></td><td>Éxito. Salió como pediste.</td></tr>
+  <tr><td><code>3xx</code></td><td>Redirección. "Eso que buscás está en otro lado." (poco frecuente al consumir APIs)</td></tr>
+  <tr><td><code>4xx</code></td><td><strong>Problema del lado cliente</strong> — vos (o tu request) mandaron algo mal.</td></tr>
+  <tr><td><code>5xx</code></td><td><strong>Problema del lado servidor</strong> — no es tu culpa, algo se rompió del otro lado.</td></tr>
+</table>
+
+<div class="callout">
+  <strong>Por qué importa distinguir 4xx de 5xx:</strong> si tu HTTP Request node en n8n tira un 4xx, el error está en lo que vos armaste (URL, body, token, permisos) — revisá tu request. Si tira un 5xx, podés reintentar más tarde o avisar que la API de terceros está caída; no hay nada que arreglar de tu lado.
+</div>
+
+<h2>Los códigos que vas a ver todo el tiempo</h2>
+
+<table>
+  <tr><th>Código</th><th>Qué te está diciendo</th></tr>
+  <tr><td><code>200 OK</code></td><td>Salió bien, acá está lo que pediste.</td></tr>
+  <tr><td><code>201 Created</code></td><td>Se creó el recurso (típico después de un POST exitoso).</td></tr>
+  <tr><td><code>204 No Content</code></td><td>Salió bien, pero no hay nada para devolver en el body (típico después de un DELETE).</td></tr>
+  <tr><td><code>400 Bad Request</code></td><td>Tu request está mal formada — JSON roto, falta un campo obligatorio.</td></tr>
+  <tr><td><code>401 Unauthorized</code></td><td>No te identificaste, o tus credenciales/token son inválidos.</td></tr>
+  <tr><td><code>403 Forbidden</code></td><td>Te identificaste bien, pero no tenés permiso para esto.</td></tr>
+  <tr><td><code>404 Not Found</code></td><td>Ese recurso (ese ID, esa URL) no existe.</td></tr>
+  <tr><td><code>409 Conflict</code></td><td>Choca con el estado actual del recurso (ej: ya existe algo con ese nombre).</td></tr>
+  <tr><td><code>429 Too Many Requests</code></td><td>Estás mandando requests más rápido de lo que la API permite.</td></tr>
+  <tr><td><code>500 Internal Server Error</code></td><td>Se rompió algo del lado del servidor, genérico.</td></tr>
+  <tr><td><code>502 / 503</code></td><td>El servidor está caído, sobrecargado, o en mantenimiento.</td></tr>
+</table>
+
+<div class="callout">
+  <strong>401 vs. 403 — la confusión más común:</strong> <code>401</code> es "no sé quién sos" (token ausente, vencido o inválido). <code>403</code> es "sé quién sos, pero no podés hacer esto" (tu usuario no tiene permiso). Si en FastPass el token de Gmail expiró, vas a ver <code>401</code> — no <code>403</code>.
+</div>
+
+<h2>Ejemplos reales</h2>
+
+<p>Estos son casos reales de APIs públicas — probá el primero vos mismo.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">GitHub API — repo que no existe</span>
+    <div class="line"><strong>GET</strong> https://api.github.com/repos/n8n-io/repo-que-no-existe</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="frame">
+    <span class="tag">Response</span>
+    <div class="line"><strong>Status: 404 Not Found</strong></div>
+    <div class="line">Body: { "message": "Not Found", "documentation_url": "https://docs.github.com/rest" }</div>
+  </div>
+</div>
+
+<p>Pegá esa URL en el navegador y vas a ver ese <code>404</code> real, con ese mensaje exacto. Así de literal es "el recurso no existe".</p>
+
+<div class="callout">
+  <strong>La excepción que confirma la regla — rate limiting en GitHub:</strong> uno esperaría que "mandaste demasiadas requests" sea <code>429</code> (la tabla de arriba dice eso), pero la <a href="https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api" target="_blank" rel="noopener">API de GitHub</a> usa <code>403</code> para su límite principal sin autenticación (60 req/hora), y reserva <code>429</code> solo para límites secundarios. Esto es <em>a propósito</em>: las categorías (2xx/4xx/5xx) son una convención fuerte, pero el código exacto para un caso puntual lo define cada API — siempre confirmá contra la documentación real, no asumas.
+</div>
+
+<p>Y del lado del éxito: si probaste el ejemplo de <strong>JSONPlaceholder</strong> de la <a href="0001-anatomia-de-una-http-request.html">Lección 1</a> (el POST a <code>/posts</code>), el <code>201 Created</code> que te devolvió es exactamente el mismo patrón que verías creando un pedido real en cualquier API de e-commerce o de pagos.</p>
+
+<h2>Poné a prueba el concepto</h2>
+
+<p>Primero, un repaso rápido de la Lección 1 antes de seguir:</p>
+
+<div class="quiz" data-answer="DELETE">
+  <div class="q-title">Repaso — Lección 1</div>
+  <div class="q-scenario">Un pedido se canceló y hay que sacarlo por completo del sistema. ¿Qué método usás?</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<p>Ahora, clasificá cada escenario por categoría de status code:</p>
+
+<div class="quiz" data-answer="4xx">
+  <div class="q-title">Escenario 1</div>
+  <div class="q-scenario">Le pedís a la API un pedido por ID, pero escribiste mal el ID en la URL y ese pedido no existe.</div>
+  <div class="quiz-options">
+    <button>2xx</button><button>4xx</button><button>5xx</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="5xx">
+  <div class="q-title">Escenario 2</div>
+  <div class="q-scenario">La API está en mantenimiento y no puede responder ningún request en este momento.</div>
+  <div class="quiz-options">
+    <button>2xx</button><button>4xx</button><button>5xx</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="2xx">
+  <div class="q-title">Escenario 3</div>
+  <div class="q-scenario">Creaste un pedido nuevo y el servidor te confirma que se guardó correctamente.</div>
+  <div class="quiz-options">
+    <button>2xx</button><button>4xx</button><button>5xx</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<p>Y ahora el código específico:</p>
+
+<div class="quiz" data-answer="201">
+  <div class="q-title">Escenario 4</div>
+  <div class="q-scenario">Mandaste un POST para crear un pedido nuevo y salió todo bien.</div>
+  <div class="quiz-options">
+    <button>200</button><button>201</button><button>204</button><button>404</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="401">
+  <div class="q-title">Escenario 5</div>
+  <div class="q-scenario">El token de autenticación de tu HTTP Request node venció.</div>
+  <div class="quiz-options">
+    <button>400</button><button>401</button><button>403</button><button>500</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="429">
+  <div class="q-title">Escenario 6</div>
+  <div class="q-scenario">Mandaste demasiados requests en poco tiempo y la API te empieza a frenar.</div>
+  <div class="quiz-options">
+    <button>403</button><button>404</button><button>429</button><button>503</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="primary-source">
+  <span class="label">Fuente primaria recomendada</span>
+  Listado completo y oficial de todos los status codes: <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status" target="_blank" rel="noopener">MDN — HTTP response status codes</a>.
+</div>
+
+<p>Referencia rápida para cuando te olvides: <a href="../reference/http-status-codes-cheatsheet.html">cheat sheet de status codes</a>.</p>
+
+<div class="followup">
+  ¿Te trabaste con algún escenario, o querés ver un status code real que te tiró n8n en FastPass? Preguntale a tu asistente — traé el error tal cual lo viste y lo desglosamos juntos.
+</div>
+
+</main>
+
+<footer class="lesson-nav">
+  <span><a href="0001-anatomia-de-una-http-request.html">← Lección 1: Anatomía de una request</a></span>
+  <span><a href="0003-headers-y-autenticacion.html">Lección 3: headers y autenticación →</a></span>
+</footer>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answer = quiz.getAttribute('data-answer');
+  var feedback = quiz.querySelector('.quiz-feedback');
+  var buttons = quiz.querySelectorAll('.quiz-options button');
+  var answered = false;
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var choice = btn.textContent.trim();
+      if (choice === answer) {
+        btn.classList.add('correct');
+        feedback.textContent = '✓ Correcto — ' + answer + '.';
+        feedback.className = 'quiz-feedback show-correct';
+      } else {
+        btn.classList.add('incorrect');
+        feedback.textContent = '✗ No — la respuesta correcta era ' + answer + '.';
+        feedback.className = 'quiz-feedback show-incorrect';
+        buttons.forEach(function (b) {
+          if (b.textContent.trim() === answer) b.classList.add('correct');
+        });
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

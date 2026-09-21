@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 3 — Headers y autenticación</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="lesson-header">
+  <span class="eyebrow">Lección 3 · HTTP y APIs</span>
+  <h1>Headers: metadata, y por qué casi todo pide un token</h1>
+  <p class="subtitle">El header que le explica al servidor qué le estás mandando, y el header que le prueba quién sos. Los dos bugs más comunes de "por qué me tira error" viven acá.</p>
+</header>
+
+<main>
+
+<p>Desde la <a href="0001-anatomia-de-una-http-request.html">Lección 1</a> venimos mencionando los <strong>headers</strong> como una de las tres piezas de toda request/response, junto al método/status y al body. Hoy los abrimos.</p>
+
+<h2>¿Qué es un header, en criollo?</h2>
+
+<p>Un header es un par <code>clave: valor</code> que viaja pegado a la request o a la response, separado del body. No son "los datos" — son <em>información sobre los datos</em>, o sobre quién los manda. Pensalo como el sobre de una carta: el body es la carta, los headers son lo que está escrito afuera del sobre (remitente, tipo de envío, prioridad).</p>
+
+<table>
+  <tr><th>Header</th><th>Para qué sirve</th></tr>
+  <tr><td><code>Content-Type</code></td><td>"El body que te mando tiene este formato" (ej: <code>application/json</code>).</td></tr>
+  <tr><td><code>Accept</code></td><td>"Quiero que me contestes en este formato."</td></tr>
+  <tr><td><code>Authorization</code></td><td>"Esta es mi credencial — así sabés quién soy."</td></tr>
+</table>
+
+<h2>El bug clásico: olvidarte del <code>Content-Type</code></h2>
+
+<p>Armás un body en JSON perfecto, pero si no le decís al servidor <code>Content-Type: application/json</code>, muchas APIs no van a saber cómo interpretarlo — y te van a devolver un <code>400 Bad Request</code> (¿te suena de la <a href="0002-status-codes.html">Lección 2</a>? el problema es tuyo, no del servidor). No es que tu JSON esté mal escrito: es que nunca le avisaste qué era.</p>
+
+<div class="callout">
+  <strong>En n8n:</strong> el HTTP Request node suele setear <code>Content-Type</code> solo cuando elegís "JSON" como tipo de body. Si armás el body a mano en modo raw, es responsabilidad tuya agregarlo en la pestaña Headers.
+</div>
+
+<h2>Cómo una API sabe quién sos: el header <code>Authorization</code></h2>
+
+<p>La mayoría de las APIs no dejan pasar a cualquiera. Necesitan una prueba de identidad, y esa prueba casi siempre viaja en el header <code>Authorization</code>. Los dos esquemas que vas a encontrar todo el tiempo:</p>
+
+<table>
+  <tr><th>Esquema</th><th>Cómo se ve</th><th>Idea</th></tr>
+  <tr><td><strong>Basic</strong></td><td><code>Authorization: Basic dXNlcjpwYXNz</code></td><td>Usuario y contraseña, codificados (no encriptados) en Base64.</td></tr>
+  <tr><td><strong>Bearer / API Key</strong></td><td><code>Authorization: Bearer abc123...</code></td><td>Un token largo que la API te dio antes, y que "portás" en cada request.</td></tr>
+</table>
+
+<p>Existen esquemas más elaborados (OAuth2, con su propia danza de redirects) para cuando una app necesita actuar en nombre de un usuario de terceros — eso lo dejamos para más adelante. Con Basic y Bearer ya cubrís la gran mayoría de lo que vas a conectar en n8n.</p>
+
+<div class="callout">
+  <strong>En n8n:</strong> cuando elegís "Basic Auth" o "Header Auth" en el dropdown de Authentication del HTTP Request node, n8n arma este header <code>Authorization</code> por vos — no lo ves, pero es exactamente lo que está pasando. Si ese token vence o está mal, es por eso que la Lección 2 te muestra un <code>401</code>: literalmente "no sé quién sos".
+</div>
+
+<h2>Ejemplos reales</h2>
+
+<p>Tres casos reales que muestran que "cómo se manda la credencial" no es siempre igual — por eso hay que leer la doc de cada API, no asumir.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">1. GitHub API — Bearer token en el header</span>
+    <div class="line"><strong>GET</strong> https://api.github.com/user</div>
+    <div class="line">Headers: Authorization: Bearer ghp_xxxxxxxxxxxxxxxx</div>
+  </div>
+</div>
+
+<p>Así es el caso "de manual": la credencial (un Personal Access Token) viaja en el header <code>Authorization</code>, exactamente como vimos arriba.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">2. OpenWeatherMap — la key va en la URL, no en un header</span>
+    <div class="line"><strong>GET</strong> https://api.openweathermap.org/data/2.5/weather?q=BuenosAires&amp;appid=TU_API_KEY</div>
+  </div>
+</div>
+
+<p>Este caso rompe la regla a propósito: OpenWeatherMap no usa <code>Authorization</code> en absoluto — la API key va como parámetro <code>appid</code> en la propia URL. No es más ni menos "correcto", es una decisión de esa API en particular. Si asumís que "la auth siempre va en un header" te vas a trabar cuando te encuentres con esto.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">3. JSONPlaceholder — Content-Type obligatorio en el POST</span>
+    <div class="line"><strong>POST</strong> https://jsonplaceholder.typicode.com/posts</div>
+    <div class="line">Headers: Content-Type: application/json; charset=UTF-8</div>
+    <div class="line">Body: { "title": "mi primer post", "body": "probando POST", "userId": 1 }</div>
+  </div>
+</div>
+
+<p>Es el mismo ejemplo de la <a href="0001-anatomia-de-una-http-request.html">Lección 1</a> — ahora mirando el header que lo hace funcionar. Si lo probaste en n8n sin este header, es probable que hayas visto un <code>400</code> de la <a href="0002-status-codes.html">Lección 2</a> en vez del <code>201</code> esperado.</p>
+
+<h2>Poné a prueba el concepto</h2>
+
+<p>Repaso de lecciones anteriores primero:</p>
+
+<div class="quiz" data-answer="POST">
+  <div class="q-title">Repaso — Lección 1</div>
+  <div class="q-scenario">Un cliente completa el formulario de FastPass para pedir un producto nuevo. ¿Qué método?</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="4xx">
+  <div class="q-title">Repaso — Lección 2</div>
+  <div class="q-scenario">Tu request tiene un JSON con una coma de más y está mal formada. ¿Qué categoría de status code esperás?</div>
+  <div class="quiz-options">
+    <button>2xx</button><button>4xx</button><button>5xx</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<p>Ahora, lo nuevo:</p>
+
+<div class="quiz" data-answer="400">
+  <div class="q-title">Escenario 1</div>
+  <div class="q-scenario">Mandaste un body en JSON perfecto, pero te olvidaste de poner el header <code>Content-Type: application/json</code>. ¿Qué status code es más probable?</div>
+  <div class="quiz-options">
+    <button>200</button><button>400</button><button>401</button><button>500</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="Authorization">
+  <div class="q-title">Escenario 2</div>
+  <div class="q-scenario">¿Qué header le dice a la API quién sos vos?</div>
+  <div class="quiz-options">
+    <button>Content-Type</button><button>Accept</button><button>Authorization</button><button>Host</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="Authorization">
+  <div class="q-title">Escenario 3</div>
+  <div class="q-scenario">En n8n configurás "Basic Auth" con usuario y contraseña para conectarte a una API. Esa credencial codificada, ¿en qué header viaja finalmente?</div>
+  <div class="quiz-options">
+    <button>Body</button><button>Content-Type</button><button>Authorization</button><button>Accept</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="primary-source">
+  <span class="label">Fuente primaria recomendada</span>
+  <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Authorization" target="_blank" rel="noopener">MDN — Authorization header</a> y <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Type" target="_blank" rel="noopener">MDN — Content-Type header</a>.
+</div>
+
+<p>Referencia rápida: <a href="../reference/http-headers-cheatsheet.html">cheat sheet de headers</a>.</p>
+
+<div class="followup">
+  ¿Alguna vez te tiró 401 en n8n y no sabías por qué? Traé ese caso puntual y lo revisamos juntos con lo de hoy.
+</div>
+
+</main>
+
+<footer class="lesson-nav">
+  <span><a href="0002-status-codes.html">← Lección 2: Status codes</a></span>
+  <span><a href="0004-tu-primera-request-real.html">Lección 4: tu primera request real →</a></span>
+</footer>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answer = quiz.getAttribute('data-answer');
+  var feedback = quiz.querySelector('.quiz-feedback');
+  var buttons = quiz.querySelectorAll('.quiz-options button');
+  var answered = false;
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var choice = btn.textContent.trim();
+      if (choice === answer) {
+        btn.classList.add('correct');
+        feedback.textContent = '✓ Correcto — ' + answer + '.';
+        feedback.className = 'quiz-feedback show-correct';
+      } else {
+        btn.classList.add('incorrect');
+        feedback.textContent = '✗ No — la respuesta correcta era ' + answer + '.';
+        feedback.className = 'quiz-feedback show-incorrect';
+        buttons.forEach(function (b) {
+          if (b.textContent.trim() === answer) b.classList.add('correct');
+        });
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 5 — Tu primera request autenticada</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="lesson-header">
+  <span class="eyebrow">Lección 5 · HTTP y APIs</span>
+  <h1>Tu primera request autenticada</h1>
+  <p class="subtitle">JSONPlaceholder no pedía nada. Casi todas las APIs reales sí. Hoy le demostrás a una API quién sos — y rompés la request a propósito para aprender a diagnosticar un 401.</p>
+</header>
+
+<main>
+
+<p>Vas a usar la <strong>API de GitHub</strong> (tenés cuenta, ¿no? si no, crearla es gratis y sirve para tu portafolio igual). Tiempo estimado: 10 minutos. Herramienta: el HTTP Request node de n8n.</p>
+
+<h2>Repaso antes de arrancar</h2>
+
+<div class="quiz" data-answer="401">
+  <div class="q-title">Repaso — Lecciones 2 y 3</div>
+  <div class="q-scenario">La API te contesta "no sé quién sos" porque el token falta o es inválido. ¿Qué status code es?</div>
+  <div class="quiz-options">
+    <button>400</button><button>401</button><button>403</button><button>404</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="Authorization">
+  <div class="q-title">Repaso — Lección 3</div>
+  <div class="q-scenario">¿En qué header viaja normalmente el token?</div>
+  <div class="quiz-options">
+    <button>Content-Type</button><button>Accept</button><button>Authorization</button><button>Host</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>Paso 1 — Probar SIN token (para ver el error)</h2>
+
+<p>Pegá esto en la barra del navegador:</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">GET sin credenciales</span>
+    <div class="line"><strong>GET</strong> https://api.github.com/user</div>
+  </div>
+</div>
+
+<details class="predict">
+  <summary>¿Qué esperás? (clic para revelar)</summary>
+  <p class="reveal">Un <strong>401</strong> con un mensaje tipo <code>"Requires authentication"</code>. Según la <a href="https://docs.github.com/en/rest/users/users#get-the-authenticated-user" target="_blank" rel="noopener">doc de GitHub</a>, <code>/user</code> devuelve "el usuario autenticado" — si no le decís quién sos, no tiene a quién devolver. Comparalo con <code>/repos/n8n-io/n8n</code> de la Lección 1: ese es público y no pide nada.</p>
+</details>
+
+<h2>Paso 2 — Conseguir un token</h2>
+
+<ol class="steps">
+  <li>En GitHub: <strong>Settings → Developer settings → Personal access tokens</strong>.</li>
+  <li>Generá un token (GitHub recomienda los <em>fine-grained</em>; para esta prueba alcanza con el mínimo de permisos y una expiración corta, por ejemplo 7 días).</li>
+  <li>Copialo — <strong>GitHub te lo muestra una sola vez</strong>.</li>
+</ol>
+
+<div class="callout">
+  <strong>El token es una contraseña.</strong> Quien lo tiene actúa como vos. No lo pegues en el chat conmigo, en un repo, ni dentro de un workflow que exportes. En n8n va en <em>Credentials</em>, que es justamente para eso (lo hacemos en el paso siguiente). Si alguna vez se te escapa uno, lo revocás en la misma pantalla donde lo creaste.
+</div>
+
+<h2>Paso 3 — La request autenticada en n8n</h2>
+
+<p>En un HTTP Request node:</p>
+<ol class="steps">
+  <li><strong>Method:</strong> GET</li>
+  <li><strong>URL:</strong> <code>https://api.github.com/user</code></li>
+  <li><strong>Authentication:</strong> Generic Credential Type → <strong>Header Auth</strong></li>
+  <li>Creá una credencial nueva. <strong>Name:</strong> <code>Authorization</code> · <strong>Value:</strong> <code>Bearer TU_TOKEN</code> (la palabra <code>Bearer</code>, un espacio, y el token)</li>
+</ol>
+
+<p><em>Alternativa más cómoda:</em> el dropdown también tiene <strong>Bearer Auth</strong>, donde cargás solo el token y n8n agrega <code>Bearer</code> por vos. Es lo mismo por debajo — ver la <a href="../reference/n8n-tipos-de-autenticacion.html">referencia de tipos de autenticación</a>.</p>
+
+<p>Es literalmente el header de la Lección 3, armado por n8n. Según la <a href="https://docs.n8n.io/integrations/builtin/credentials/httprequest/" target="_blank" rel="noopener">doc de n8n</a>, Header Auth es solo eso: un Name y un Value que viajan en cada request.</p>
+
+<details class="predict">
+  <summary>¿Qué esperás ahora?</summary>
+  <p class="reveal"><strong>200 OK</strong>, con un JSON de tu propio perfil: <code>login</code> (tu usuario), <code>id</code>, <code>avatar_url</code>, <code>public_repos</code>, etc. Fijate que la misma URL que antes te dio 401 ahora da 200: lo único que cambió es el header <code>Authorization</code>.</p>
+</details>
+
+<h2>Paso 4 — Rompelo a propósito</h2>
+
+<p>Editá la credencial y cambiá <strong>un solo carácter</strong> del token. Ejecutá de nuevo. Deberías ver un <code>401</code> otra vez.</p>
+
+<p>Esto es lo más útil de la lección: <strong>un 401 casi nunca se arregla tocando la URL, el método o el body</strong>. Es un problema de credenciales — token mal copiado, vencido, revocado, o sin el prefijo <code>Bearer</code>. Cuando FastPass te tire un 401, ya sabés dónde mirar.</p>
+
+<div class="callout">
+  <strong>Dos matices reales que documenta GitHub:</strong> (1) si tu token es válido pero no tiene permiso para lo que pedís, podés recibir <code>403</code> <em>o incluso 404</em> — GitHub a veces responde 404 para no confirmar que un recurso privado existe. (2) Si fallás la autenticación muchas veces seguidas, GitHub te rechaza <em>todos</em> los intentos con <code>403</code> por un rato. O sea: un 404 no siempre significa "no existe", y un 403 no siempre significa "sin permiso". Las categorías guían, la doc de cada API decide. (Fuente: <a href="https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api" target="_blank" rel="noopener">GitHub Docs — Authenticating to the REST API</a>).
+</div>
+
+<h2>El mismo patrón, en otras APIs</h2>
+
+<p>Lo que acabás de hacer se repite casi igual afuera. Por ejemplo, las APIs de OpenAI (que vas a usar con el SDK/LangChain) y de Mercado Pago (para EVACAKES) usan también <code>Authorization: Bearer &lt;token&gt;</code> — confirmalo en su doc cuando llegues, pero la idea es la misma: obtenés un token en el panel del servicio, lo guardás como credencial, y viaja en ese header. Aprendiste el patrón una vez.</p>
+
+<h2>Poné a prueba el concepto</h2>
+
+<div class="quiz" data-answer="Credenciales">
+  <div class="q-title">Diagnóstico 1</div>
+  <div class="q-scenario">Tu nodo funcionaba ayer y hoy devuelve 401. La URL y el body no cambiaron. ¿Dónde mirás primero?</div>
+  <div class="quiz-options">
+    <button>Credenciales</button><button>La URL</button><button>El método</button><button>El body</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="Bearer TOKEN">
+  <div class="q-title">Diagnóstico 2</div>
+  <div class="q-scenario">¿Cómo se ve el Value correcto de la credencial Header Auth para GitHub?</div>
+  <div class="quiz-options">
+    <button>Bearer TOKEN</button><button>Bearer=TOKEN</button><button>Token: TOKEN</button><button>TOKEN Bearer</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="Puede ser permisos">
+  <div class="q-title">Diagnóstico 3</div>
+  <div class="q-scenario">Pedís un repo privado tuyo con un token válido y recibís 404. ¿Qué conclusión es la más razonable?</div>
+  <div class="quiz-options">
+    <button>Puede ser permisos</button><button>El repo se borró</button><button>GitHub está caído</button><button>Falta un Content-Type</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="primary-source">
+  <span class="label">Fuente primaria recomendada</span>
+  <a href="https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api" target="_blank" rel="noopener">GitHub Docs — Authenticating to the REST API</a> · <a href="https://docs.n8n.io/integrations/builtin/credentials/httprequest/" target="_blank" rel="noopener">n8n Docs — HTTP Request credentials</a>
+</div>
+
+<div class="followup">
+  Contame qué te dio cada paso (sobre todo el 401 del principio y el del "carácter cambiado"). Y no me pases el token: con los status codes y el mensaje del body alcanza para ayudarte.
+</div>
+
+</main>
+
+<footer class="lesson-nav">
+  <span><a href="0004-tu-primera-request-real.html">← Lección 4: Tu primera request real</a></span>
+  <span><a href="0006-parametros-y-paginacion.html">Lección 6: parámetros y paginación →</a></span>
+</footer>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answer = quiz.getAttribute('data-answer');
+  var feedback = quiz.querySelector('.quiz-feedback');
+  var buttons = quiz.querySelectorAll('.quiz-options button');
+  var answered = false;
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var choice = btn.textContent.trim();
+      if (choice === answer) {
+        btn.classList.add('correct');
+        feedback.textContent = '✓ Correcto — ' + answer + '.';
+        feedback.className = 'quiz-feedback show-correct';
+      } else {
+        btn.classList.add('incorrect');
+        feedback.textContent = '✗ No — la respuesta correcta era ' + answer + '.';
+        feedback.className = 'quiz-feedback show-incorrect';
+        buttons.forEach(function (b) {
+          if (b.textContent.trim() === answer) b.classList.add('correct');
+        });
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

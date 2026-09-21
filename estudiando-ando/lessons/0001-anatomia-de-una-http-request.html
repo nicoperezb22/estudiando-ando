@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 1 — Anatomía de una request HTTP</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="lesson-header">
+  <span class="eyebrow">Lección 1 · HTTP y APIs</span>
+  <h1>Anatomía de una request HTTP</h1>
+  <p class="subtitle">Qué pasa realmente cuando un HTTP Request node de n8n "habla" con Gmail o Sheets — y cómo elegir el método correcto.</p>
+</header>
+
+<main>
+
+<p>Cada vez que <strong>FastPass</strong> lee un correo o escribe una fila en Sheets, en algún lugar de n8n se dispara esto: un programa (n8n) le pide algo a otro programa (la API de Gmail o de Sheets), usando un formato de mensaje fijo llamado <strong>HTTP</strong>. Ese formato es el mismo sin importar si hablás con Gmail, con Mercado Pago o con una API que vos mismo escribas el día de mañana. Aprenderlo una vez te sirve para siempre.</p>
+
+<h2>Las dos mitades de la conversación</h2>
+
+<p>Toda interacción HTTP tiene exactamente dos partes: una <strong>request</strong> (lo que el cliente pide) y una <strong>response</strong> (lo que el servidor contesta). Así se vería si n8n le pidiera a Gmail los últimos correos:</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">Request (n8n → Gmail)</span>
+    <div class="line"><strong>GET</strong> /gmail/v1/messages</div>
+    <div class="line">Headers: Authorization: Bearer &lt;token&gt;</div>
+    <div class="line">Body: (vacío)</div>
+  </div>
+  <div class="arrow">↓ el servidor procesa y contesta ↓</div>
+  <div class="frame">
+    <span class="tag">Response (Gmail → n8n)</span>
+    <div class="line"><strong>Status: 200 OK</strong></div>
+    <div class="line">Headers: Content-Type: application/json</div>
+    <div class="line">Body: { "messages": [ { "id": "18f3a2" }, ... ] }</div>
+  </div>
+</div>
+
+<p>Cuatro piezas para memorizar, dos por lado:</p>
+
+<table>
+  <tr><th>En la request</th><th>En la response</th></tr>
+  <tr><td><strong>Método + URL</strong> — qué querés hacer, y sobre qué recurso</td><td><strong>Status code</strong> — si salió bien, mal, y por qué</td></tr>
+  <tr><td><strong>Headers</strong> — metadata (auth, formato de datos)</td><td><strong>Headers</strong> — metadata de la respuesta</td></tr>
+  <tr><td><strong>Body</strong> — los datos que mandás (si hace falta)</td><td><strong>Body</strong> — los datos que te devuelve</td></tr>
+</table>
+
+<div class="callout">
+  <strong>Dónde lo ves en n8n:</strong> el HTTP Request node tiene un campo <em>Method</em> (el verbo), un campo <em>URL</em>, y pestañas separadas para <em>Headers</em> y <em>Body</em>. Es literalmente el mismo diagrama de arriba, con inputs.
+</div>
+
+<h2>Los métodos: qué le estás pidiendo al servidor</h2>
+
+<p>El método es la parte que más se presta a confusión, así que la clave no es memorizar la lista — es entender <em>qué efecto tiene cada uno sobre el recurso</em>.</p>
+
+<table>
+  <tr><th>Método</th><th>Qué le pedís al servidor</th><th>¿Repetirlo cambia el resultado?</th></tr>
+  <tr><td><code>GET</code></td><td>"Dame información." No modifica nada.</td><td>No — podés repetirlo mil veces sin efecto (<em>idempotente</em>).</td></tr>
+  <tr><td><code>POST</code></td><td>"Creá algo nuevo." Manda datos en el body.</td><td>Sí — cada repetición suele crear un recurso nuevo.</td></tr>
+  <tr><td><code>PUT</code></td><td>"Reemplazá esto por completo." Mandás el objeto entero.</td><td>No — mandarlo 5 veces da el mismo resultado que 1 vez.</td></tr>
+  <tr><td><code>PATCH</code></td><td>"Modificá solo esta parte." Mandás solo lo que cambia.</td><td>Depende de la API — en general se trata como si no.</td></tr>
+  <tr><td><code>DELETE</code></td><td>"Borrá esto."</td><td>No — borrarlo de nuevo no tiene efecto adicional.</td></tr>
+</table>
+
+<p><strong>Idempotente</strong> es la palabra técnica para "repetirlo no cambia nada más". Es útil porque te dice qué métodos son seguros de reintentar automáticamente si una request falla por timeout — con <code>POST</code> hay que tener cuidado (podrías crear el mismo pedido dos veces); con <code>GET</code>, <code>PUT</code> o <code>DELETE</code>, no.</p>
+
+<div class="callout">
+  <strong>Ejemplo FastPass:</strong> leer correos nuevos de Gmail → <code>GET</code>. Agregar una fila a Sheets con un pedido nuevo → <code>POST</code>. Si algún día FastPass tuviera que corregir un pedido ya cargado → <code>PATCH</code> (solo el campo que cambió) en vez de reescribir la fila entera.
+</div>
+
+<h2>Ejemplos reales, fuera de n8n</h2>
+
+<p>n8n te esconde el detalle. Para que se te grabe de verdad, mirá estos tres casos con APIs públicas reales — dos los podés probar ahora mismo.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">1. GitHub API — GET, sin autenticación</span>
+    <div class="line"><strong>GET</strong> https://api.github.com/repos/n8n-io/n8n</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="frame">
+    <span class="tag">Response</span>
+    <div class="line"><strong>Status: 200 OK</strong></div>
+    <div class="line">Body: { "full_name": "n8n-io/n8n", "stargazers_count": 48000, "language": "TypeScript", ... }</div>
+  </div>
+</div>
+
+<p>Pegá esa URL directo en tu navegador — es pública, no hace falta token, y el navegador te muestra el JSON tal cual llega.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">2. JSONPlaceholder — POST, API hecha para practicar</span>
+    <div class="line"><strong>POST</strong> https://jsonplaceholder.typicode.com/posts</div>
+    <div class="line">Body: { "title": "mi primer post", "body": "probando POST", "userId": 1 }</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="frame">
+    <span class="tag">Response</span>
+    <div class="line"><strong>Status: 201 Created</strong></div>
+    <div class="line">Body: { "title": "mi primer post", "body": "probando POST", "userId": 1, "id": 101 }</div>
+  </div>
+</div>
+
+<p><a href="https://jsonplaceholder.typicode.com/" target="_blank" rel="noopener">JSONPlaceholder</a> existe específicamente para esto: podés armar un HTTP Request node en n8n apuntando ahí y probar GET/POST/PUT/PATCH/DELETE sin miedo a romper nada — no guarda de verdad lo que le mandás, pero contesta como si fuera una API real.</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">3. OpenWeatherMap — GET con parámetros en la URL</span>
+    <div class="line"><strong>GET</strong> https://api.openweathermap.org/data/2.5/weather?q=BuenosAires&amp;appid=TU_API_KEY</div>
+  </div>
+</div>
+
+<p>Este caso muestra algo que no vimos todavía: un GET puede llevar información extra como <em>parámetros en la URL</em> (todo lo que va después del <code>?</code>) para filtrar qué querés — acá, qué ciudad. No hace falta body para eso.</p>
+
+<h2>Poné a prueba el concepto</h2>
+
+<p>Para cada escenario, elegí el método HTTP correcto. No hay trampa — pensá en el efecto sobre el recurso, como en la tabla de arriba.</p>
+
+<div class="quiz" data-answer="POST">
+  <div class="q-title">Escenario 1</div>
+  <div class="q-scenario">Un cliente completa el formulario de FastPass para pedir un producto nuevo en la sala VIP.</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="GET">
+  <div class="q-title">Escenario 2</div>
+  <div class="q-scenario">n8n necesita traer la lista de pedidos pendientes desde Google Sheets, sin modificar nada.</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="PATCH">
+  <div class="q-title">Escenario 3</div>
+  <div class="q-scenario">Un pedido ya cargado tiene mal solo el número de mesa, y querés corregir únicamente ese campo.</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="DELETE">
+  <div class="q-title">Escenario 4</div>
+  <div class="q-scenario">Un pedido se canceló y hay que sacarlo por completo del sistema.</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="PUT">
+  <div class="q-title">Escenario 5</div>
+  <div class="q-scenario">Tenés el objeto completo y actualizado de un pedido (todos sus campos) y querés que reemplace por completo a la versión vieja.</div>
+  <div class="quiz-options">
+    <button>GET</button><button>POST</button><button>PUT</button><button>PATCH</button><button>DELETE</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="primary-source">
+  <span class="label">Fuente primaria recomendada</span>
+  Para la definición oficial y completa de cada método (incluyendo seguridad e idempotencia formal): <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods" target="_blank" rel="noopener">MDN — HTTP request methods</a>.<br>
+  Para ver estos mismos conceptos aplicados en la herramienta que ya usás: <a href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest" target="_blank" rel="noopener">n8n Docs — HTTP Request node</a>.
+</div>
+
+<p>Referencia rápida para volver cuando te olvides (va a pasar, y está bien): <a href="../reference/http-methods-cheatsheet.html">cheat sheet de métodos HTTP</a>.</p>
+
+<div class="followup">
+  ¿Algo no cerró, o querés que profundicemos en un escenario específico de FastPass? Preguntale a tu asistente ahora mismo — para eso está, es tu profesor en este espacio.
+</div>
+
+</main>
+
+<footer class="lesson-nav">
+  <span>Lección 1</span>
+  <span><a href="0002-status-codes.html">Lección 2: status codes →</a></span>
+</footer>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answer = quiz.getAttribute('data-answer');
+  var feedback = quiz.querySelector('.quiz-feedback');
+  var buttons = quiz.querySelectorAll('.quiz-options button');
+  var answered = false;
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var choice = btn.textContent.trim();
+      if (choice === answer) {
+        btn.classList.add('correct');
+        feedback.textContent = '✓ Correcto — ' + answer + ' es el método adecuado acá.';
+        feedback.className = 'quiz-feedback show-correct';
+      } else {
+        btn.classList.add('incorrect');
+        feedback.textContent = '✗ No — pensá en el efecto sobre el recurso. La respuesta correcta era ' + answer + '.';
+        feedback.className = 'quiz-feedback show-incorrect';
+        buttons.forEach(function (b) {
+          if (b.textContent.trim() === answer) b.classList.add('correct');
+        });
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>

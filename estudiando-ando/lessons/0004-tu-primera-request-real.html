@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 4 — Tu primera request real</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="lesson-header">
+  <span class="eyebrow">Lección 4 · HTTP y APIs</span>
+  <h1>De la documentación a tu primera request real</h1>
+  <p class="subtitle">Ya sabés elegir método, leer un status code y entender headers/auth por separado. Hoy lo hacés todo junto, de punta a punta, con una API real — vos apretando el botón.</p>
+</header>
+
+<main>
+
+<p>Esta lección se hace, no se lee. Vas a necesitar 5 minutos y una de estas dos herramientas: n8n (el HTTP Request node que ya conocés) o la consola del navegador (F12 → pestaña Console). Elegí la que tengas más a mano.</p>
+
+<h2>Repaso antes de arrancar</h2>
+
+<div class="quiz" data-answer="4xx">
+  <div class="q-title">Repaso — Lección 2</div>
+  <div class="q-scenario">Vas a pedir el post con id 9999 en una API que solo tiene 100 posts. ¿Qué categoría de status esperás?</div>
+  <div class="quiz-options">
+    <button>2xx</button><button>4xx</button><button>5xx</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="400">
+  <div class="q-title">Repaso — Lección 3</div>
+  <div class="q-scenario">Armás un POST con body en JSON pero te olvidás del header Content-Type. ¿Qué status es más probable?</div>
+  <div class="quiz-options">
+    <button>200</button><button>400</button><button>401</button><button>500</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>Paso 1 — Leer la documentación (así sea mínima)</h2>
+
+<p>Antes de tocar nada, así es la "doc" de la API que vamos a usar hoy, <a href="https://jsonplaceholder.typicode.com/" target="_blank" rel="noopener">JSONPlaceholder</a> — pensada exactamente para practicar esto sin romper nada real:</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">Doc resumida</span>
+    <div class="line">Base URL: https://jsonplaceholder.typicode.com</div>
+    <div class="line">Recurso: /posts</div>
+    <div class="line">Métodos soportados: GET, POST, PUT, PATCH, DELETE</div>
+    <div class="line">Body esperado (POST/PUT/PATCH): { "title": string, "body": string, "userId": number }</div>
+    <div class="line">Auth: ninguna</div>
+  </div>
+</div>
+
+<p>Esto es exactamente lo que vas a buscar en la doc de cualquier API real: la URL base, qué métodos acepta cada recurso, qué forma tiene el body, y si pide autenticación. Con esos cuatro datos ya podés armar la request sin adivinar nada.</p>
+
+<h2>Paso 2 — Armar el POST</h2>
+
+<p><strong>Opción A — n8n:</strong> arrastrá un HTTP Request node y configurá:</p>
+<ol class="steps">
+  <li><strong>Method:</strong> POST</li>
+  <li><strong>URL:</strong> https://jsonplaceholder.typicode.com/posts</li>
+  <li><strong>Body Content Type:</strong> JSON</li>
+  <li><strong>Body:</strong> <code>{ "title": "mi primer post", "body": "probando POST", "userId": 1 }</code></li>
+</ol>
+<p>Al elegir "JSON" como tipo de body, n8n pone el header <code>Content-Type</code> por vos — es la Lección 3 trabajando en segundo plano.</p>
+
+<p><strong>Opción B — consola del navegador:</strong> abrí cualquier pestaña, F12, pestaña Console, y pegá:</p>
+
+<pre><code>fetch('https://jsonplaceholder.typicode.com/posts', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ title: 'mi primer post', body: 'probando POST', userId: 1 })
+})
+  .then(r => r.json())
+  .then(console.log)</code></pre>
+
+<p>Acá el <code>Content-Type</code> lo escribís vos a mano — mismo concepto, sin la ayuda automática de n8n.</p>
+
+<details class="predict">
+  <summary>Antes de ejecutar: ¿qué status code esperás? (clic para revelar)</summary>
+  <p class="reveal">Debería darte <strong>201 Created</strong> — estás creando un recurso nuevo con POST. El body de la respuesta te va a devolver lo mismo que mandaste, más un <code>id</code> nuevo (probablemente <code>101</code>). Ejecutalo ahora y confirmá.</p>
+</details>
+
+<div class="callout">
+  <strong>¿Dónde queda ese post?</strong> En ningún lado. JSONPlaceholder es una API "de mentira": contesta como si hubiera creado el post (<code>201</code> + un <code>id</code>), pero no guarda nada. Lo que ves en el output del nodo es la <em>respuesta</em> del servidor — eco de lo que mandaste más un id — y vive solo en los datos de esa ejecución de n8n. Si ejecutás el nodo otra vez, manda un POST nuevo y recibís de nuevo <code>id: 101</code>. Comprobalo: un <code>GET /posts/101</code> te da <code>404</code>. En una API real, el servidor lo guardaría en su base de datos y ahí sí lo podrías volver a pedir.
+</div>
+
+<h2>Paso 3 — Ahora un GET, y un caso que falla</h2>
+
+<p>Probá estas dos, en n8n o con <code>fetch</code> (con method GET no hace falta body ni Content-Type):</p>
+
+<div class="wire">
+  <div class="frame">
+    <span class="tag">GET que existe</span>
+    <div class="line">GET https://jsonplaceholder.typicode.com/posts/1</div>
+  </div>
+  <div class="frame">
+    <span class="tag">GET que no existe</span>
+    <div class="line">GET https://jsonplaceholder.typicode.com/posts/9999</div>
+  </div>
+</div>
+
+<details class="predict">
+  <summary>¿Qué esperás de cada uno?</summary>
+  <p class="reveal">El primero: <strong>200 OK</strong> con el post 1 en el body. El segundo: <strong>404 Not Found</strong> — no existe un post con ese id. Es el mismo patrón que viste con el repo inexistente de GitHub en la Lección 2, ahora con otra API.</p>
+</details>
+
+<h2>Desafío — hacelo vos, sin la guía</h2>
+
+<p>Con lo que ya sabés, resolvé esto sin que te lo desglose paso a paso: hacé un <code>PATCH</code> a <code>https://jsonplaceholder.typicode.com/posts/1</code> cambiando <strong>solo</strong> el campo <code>title</code> a lo que quieras. Pensá: ¿por qué PATCH y no PUT acá? (Lección 1). ¿Qué status esperás si sale bien? (pista: no es 201 — eso es exclusivo de crear con POST).</p>
+
+<div class="quiz" data-answer="200">
+  <div class="q-title">Chequeo del desafío</div>
+  <div class="q-scenario">Hiciste PATCH a /posts/1 cambiando solo el título y salió bien. ¿Qué status esperás?</div>
+  <div class="quiz-options">
+    <button>200</button><button>201</button><button>204</button><button>404</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="3">
+  <div class="q-title">Idempotencia, de vuelta</div>
+  <div class="q-scenario">Imaginá que el POST del Paso 2 fuera contra una API <em>real</em> (una que sí guarda datos, no JSONPlaceholder) y lo repetís tres veces seguidas, exactamente igual. Según lo que viste en la Lección 1 sobre idempotencia de POST, ¿cuántos recursos "nuevos" se crean?</div>
+  <div class="quiz-options">
+    <button>0</button><button>1</button><button>3</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="callout">
+  <strong>Por qué importa esto último:</strong> es la razón real por la que en n8n hay que tener cuidado con reintentos automáticos en nodos POST — un timeout seguido de un reintento puede duplicar un pedido de verdad. Con GET, PUT o DELETE, reintentar es seguro.
+</div>
+
+<div class="followup">
+  Contame qué status codes te dio cada paso — si algo no coincidió con lo esperado, es la mejor oportunidad para ver por qué (a veces el motivo es más interesante que si hubiera salido bien a la primera).
+</div>
+
+</main>
+
+<footer class="lesson-nav">
+  <span><a href="0003-headers-y-autenticacion.html">← Lección 3: Headers y autenticación</a></span>
+  <span><a href="0005-tu-primera-request-autenticada.html">Lección 5: tu primera request autenticada →</a></span>
+</footer>
+
+<script>
+document.querySelectorAll('.quiz').forEach(function (quiz) {
+  var answer = quiz.getAttribute('data-answer');
+  var feedback = quiz.querySelector('.quiz-feedback');
+  var buttons = quiz.querySelectorAll('.quiz-options button');
+  var answered = false;
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (answered) return;
+      answered = true;
+      var choice = btn.textContent.trim();
+      if (choice === answer) {
+        btn.classList.add('correct');
+        feedback.textContent = '✓ Correcto — ' + answer + '.';
+        feedback.className = 'quiz-feedback show-correct';
+      } else {
+        btn.classList.add('incorrect');
+        feedback.textContent = '✗ No — la respuesta correcta era ' + answer + '.';
+        feedback.className = 'quiz-feedback show-incorrect';
+        buttons.forEach(function (b) {
+          if (b.textContent.trim() === answer) b.classList.add('correct');
+        });
+      }
+    });
+  });
+});
+</script>
+
+</body>
+</html>
