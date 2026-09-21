@@ -25,6 +25,13 @@
 - [Gmail API: users.messages.list](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list)
   `maxResults` (100 por defecto, 500 máx), `pageToken`/`nextPageToken`, `q`. Use for: paginación por token, directo al caso de FastPass.
 
+- [MDN: HTTP messages](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages)
+  Estructura de una request/response completa: start line, headers, body. Use for: fuente primaria de la Lección 7 — cómo se arma el body de un POST/PUT/PATCH y su relación con `Content-Type`.
+- [JSONPlaceholder](https://jsonplaceholder.typicode.com/)
+  API pública falsa para practicar POST/PUT/PATCH sin efectos reales. Use for: ejemplo aplicado de la Lección 7.
+- [GitHub Docs: Create an issue](https://docs.github.com/en/rest/issues/issues#create-an-issue)
+  Ejemplo real de POST autenticado con body JSON. Use for: segundo ejemplo aplicado de la Lección 7, conecta con la Lección 5 (auth).
+
 ## Gaps
 
 - Falta recurso sobre el **flujo de OAuth2** (el intercambio con redirects) — sigue fuera de alcance en [[MISSION]]; la Lección 3 cubre Basic Auth y API Key/Bearer token, que alcanza para lo que Nico usa hoy en n8n.

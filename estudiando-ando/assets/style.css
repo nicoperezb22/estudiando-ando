@@ -1,0 +1,167 @@
+/* Shared stylesheet for the "HTTP y APIs" teaching workspace. Tufte-ish: readable serif body, tight margins, print-friendly. */
+
+:root {
+  --ink: #1a1a1a;
+  --paper: #fdfcf9;
+  --muted: #6b6b6b;
+  --rule: #ddd6c8;
+  --accent: #9a3324;
+  --code-bg: #f2efe6;
+  --ok: #2f6f4f;
+  --bad: #9a3324;
+  --max-width: 42rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ece6d8;
+    --paper: #1c1a16;
+    --muted: #9c968a;
+    --rule: #423e35;
+    --accent: #e0a08a;
+    --code-bg: #2a271f;
+    --ok: #7fbf9f;
+    --bad: #e0a08a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  line-height: 1.6;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 3rem 1.25rem 6rem;
+}
+
+h1, h2, h3 {
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.9rem;
+  border-bottom: 2px solid var(--rule);
+  padding-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin-top: 2.5rem;
+}
+
+p, li { font-size: 1.05rem; }
+
+.kicker {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.lesson-nav {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+.lesson-nav a { color: var(--accent); }
+
+blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 1.5rem 0;
+  padding: 0.1rem 1rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+code, pre {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+
+code { padding: 0.1rem 0.35rem; }
+
+pre {
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+}
+pre code { padding: 0; background: none; }
+
+.callout {
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--accent);
+  background: var(--code-bg);
+  padding: 0.9rem 1.1rem;
+  border-radius: 4px;
+  margin: 1.5rem 0;
+}
+
+.sources {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+}
+.sources a { color: var(--accent); }
+
+.quiz {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 1.25rem 1.25rem 0.5rem;
+  margin: 2rem 0;
+  background: var(--code-bg);
+}
+.quiz h3 { margin-top: 0; font-size: 1.05rem; }
+.quiz-item { margin-bottom: 1.25rem; }
+.quiz-item p.q { font-weight: 600; margin-bottom: 0.4rem; }
+.quiz-item input[type="text"] {
+  font-family: inherit;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 22rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.quiz-item button {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.quiz-item .feedback {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+.feedback.correct { color: var(--ok); }
+.feedback.incorrect { color: var(--bad); }
+
+.footer-note {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+@media print {
+  body { max-width: none; padding: 0.5rem 1rem; }
+  .quiz button { display: none; }
+}

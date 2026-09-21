@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 7 · El body de la request</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<p class="lesson-nav">← <a href="#" onclick="history.back(); return false;">Lecciones</a> · HTTP y APIs</p>
+<p class="kicker">Lección 7</p>
+<h1>El body de la request: mandar datos en POST / PUT / PATCH</h1>
+
+<p>
+Hasta ahora viste <strong>qué</strong> método usar (GET/POST/PUT/PATCH/DELETE),
+<strong>qué</strong> te devuelve el servidor (status codes) y <strong>cómo</strong>
+te identificás (header <code>Authorization</code>). Falta la pieza que
+completa un POST o un PUT: el <strong>body</strong> — los datos que vos le
+mandás al servidor, no al revés.
+</p>
+
+<blockquote>
+Regla rápida: si el método es <strong>GET</strong> o <strong>DELETE</strong>, normalmente no hay body —
+los datos van en la URL (query params) o en el path. Si es <strong>POST</strong>, <strong>PUT</strong> o
+<strong>PATCH</strong>, el body es donde vive la información que estás creando o modificando.
+</blockquote>
+
+<h2>1. El body no es texto libre, es un contrato</h2>
+
+<p>
+El body es una cadena de bytes. Nada más. Para que el servidor sepa
+<em>cómo leerla</em>, necesita el header <code>Content-Type</code> que ya viste en la
+Lección 3 — casi siempre <code>application/json</code> en APIs modernas. Sin ese
+header, el servidor puede interpretar mal el body o rechazarlo directamente
+(ese es justo el bug que la Lección 3 nombraba como "clásico").
+</p>
+
+<pre><code>POST /posts HTTP/1.1
+Host: jsonplaceholder.typicode.com
+Content-Type: application/json
+
+{
+  "title": "foo",
+  "body": "bar",
+  "userId": 1
+}</code></pre>
+
+<p>
+Tres partes, siempre en ese orden de responsabilidad:
+</p>
+<ul>
+  <li><strong>Método</strong> (<code>POST</code>) → decide la acción.</li>
+  <li><strong>Header <code>Content-Type</code></strong> → declara el formato del body.</li>
+  <li><strong>Body</strong> → los datos, en ese formato.</li>
+</ul>
+
+<h2>2. Caso real 1 — JSONPlaceholder (API pública de prueba)</h2>
+
+<p>
+<a href="https://jsonplaceholder.typicode.com/" target="_blank" rel="noopener">JSONPlaceholder</a>
+es una API falsa hecha para practicar sin romper nada real. Un POST a
+<code>/posts</code> con el body de arriba te devuelve <strong>201 Created</strong> y el
+mismo objeto con un <code>id</code> nuevo — el servidor no lo guarda de verdad, pero
+simula el ciclo completo.
+</p>
+
+<h2>3. Caso real 2 — GitHub API (crear un issue)</h2>
+
+<p>
+Para crear un issue con la <a href="https://docs.github.com/en/rest/issues/issues#create-an-issue" target="_blank" rel="noopener">GitHub REST API</a>
+mandás:
+</p>
+<pre><code>POST /repos/OWNER/REPO/issues HTTP/1.1
+Authorization: Bearer TU_TOKEN
+Content-Type: application/json
+
+{
+  "title": "Bug en el flujo de lista de espera",
+  "body": "Descripción del problema...",
+  "labels": ["bug"]
+}</code></pre>
+<p>
+Notá que acá el <code>Authorization</code> (Lección 3) y el <code>Content-Type</code> conviven
+en la misma request — no son alternativas, son headers independientes que
+casi siempre viajan juntos en un POST autenticado.
+</p>
+
+<h2>4. Aplicado a n8n (tu caso real, FastPass)</h2>
+
+<div class="callout">
+En el <strong>HTTP Request node</strong> de n8n: pestaña <em>Body</em> → activás
+<code>Send Body</code> → <code>Body Content Type: JSON</code> → elegís <em>Using Fields
+Below</em> (armás campo por campo, n8n arma el JSON solo) o <em>Using JSON</em> (escribís
+el JSON crudo vos, útil si necesitás anidar objetos o arrays). n8n agrega el
+header <code>Content-Type: application/json</code> automáticamente cuando elegís
+<code>Body Content Type: JSON</code> — por eso en n8n rara vez ves ese bug de la
+Lección 3, el nodo lo previene por vos.
+</div>
+
+<h2>Quiz — recall activo</h2>
+<p>Escribí la respuesta antes de mostrarla. No hay pistas de formato: todas las respuestas correctas tienen la misma longitud aproximada.</p>
+
+<div class="quiz">
+  <h3>Autoevaluación</h3>
+
+  <div class="quiz-item">
+    <p class="q">1. En un POST, ¿qué header le dice al servidor cómo interpretar el body?</p>
+    <input type="text" id="q1" placeholder="tu respuesta">
+    <button onclick="check('q1','fb1','content-type')">Revisar</button>
+    <span class="feedback" id="fb1"></span>
+  </div>
+
+  <div class="quiz-item">
+    <p class="q">2. ¿En cuál de estos dos métodos NO suele ir un body: GET o PATCH?</p>
+    <input type="text" id="q2" placeholder="tu respuesta">
+    <button onclick="check('q2','fb2','get')">Revisar</button>
+    <span class="feedback" id="fb2"></span>
+  </div>
+
+  <div class="quiz-item">
+    <p class="q">3. Si mandás JSON sin declarar Content-Type, ¿qué arriesgás que haga el servidor?</p>
+    <input type="text" id="q3" placeholder="tu respuesta (una palabra: qué hace mal)">
+    <button onclick="check('q3','fb3','rechazarlo|malinterpretarlo|interpretarlo mal|rechaza|rechazar')">Revisar</button>
+    <span class="feedback" id="fb3"></span>
+  </div>
+</div>
+
+<p>
+Si algo de esto no te cerró del todo, preguntame directamente — soy tu
+profesor acá, y esta lección solo tiene sentido si la seguís usando en tus
+propios flujos de n8n.
+</p>
+
+<p class="sources">
+Fuente primaria recomendada:
+<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Messages" target="_blank" rel="noopener">MDN — HTTP messages (estructura de request/body)</a>.
+</p>
+
+<p class="footer-note">
+Lección 7 de 7 · HTTP y APIs · <a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a>
+</p>
+
+<script>
+function check(inputId, fbId, answerPattern) {
+  const val = document.getElementById(inputId).value.trim().toLowerCase();
+  const fb = document.getElementById(fbId);
+  const re = new RegExp(answerPattern, 'i');
+  if (re.test(val)) {
+    fb.textContent = 'Correcto.';
+    fb.className = 'feedback correct';
+  } else {
+    fb.textContent = 'No es eso — releé la sección 1 o 4 y probá de nuevo.';
+    fb.className = 'feedback incorrect';
+  }
+}
+</script>
+
+</body>
+</html>
