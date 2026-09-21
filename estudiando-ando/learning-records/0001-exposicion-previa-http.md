@@ -1,0 +1,3 @@
+# Exposición previa a HTTP/APIs — superficial, sin retención
+
+Nico ya estuvo expuesto a HTTP y sus métodos antes (principalmente a través de n8n), pero lo declara explícitamente: "me cuesta", "ya me olvidé". Hubo exposición, no aprendizaje duradero. Implicación para próximas sesiones: no asumir que "ya lo vio" significa que no hace falta cubrirlo desde la base — pero tampoco tratarlo como si fuera 100% nuevo, ya que reconoce el tema al verlo. Priorizar ejercicios de recall activo (quizzes, reconstrucción desde cero) por sobre relectura, dado el patrón de olvido reportado. Ver [[MISSION]] — esto es la razón de la restricción de "retención por sobre cobertura".
