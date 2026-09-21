@@ -33,6 +33,8 @@
   Ejemplo real de POST autenticado con body JSON. Use for: segundo ejemplo aplicado de la Lección 7, conecta con la Lección 5 (auth).
 - [MDN: URI — Query](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Query)
   Sintaxis y semántica de la query string. Use for: fuente primaria de la Lección 8 — distinción path param / query param.
+- [Stripe Docs: Idempotent requests](https://stripe.com/docs/api/idempotent_requests)
+  Ejemplo real de industria del header `Idempotency-Key` para proteger POSTs de reintentos duplicados. Use for: ejemplo aplicado de la Lección 9, conecta directo con el riesgo de reintentos en n8n/FastPass.
 
 ## Gaps
 

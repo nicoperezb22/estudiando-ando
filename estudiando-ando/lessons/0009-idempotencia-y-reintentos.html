@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 9 · Idempotencia y reintentos</title>
+<style>
+:root {
+  --ink: #1a1a1a; --paper: #fdfcf9; --muted: #6b6b6b; --rule: #ddd6c8;
+  --accent: #9a3324; --code-bg: #f2efe6; --ok: #2f6f4f; --bad: #9a3324;
+  --max-width: 42rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ece6d8; --paper: #1c1a16; --muted: #9c968a; --rule: #423e35;
+    --accent: #e0a08a; --code-bg: #2a271f; --ok: #7fbf9f; --bad: #e0a08a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  line-height: 1.6; max-width: var(--max-width); margin: 0 auto;
+  padding: 3rem 1.25rem 6rem;
+}
+h1, h2, h3 { font-family: inherit; font-weight: 600; line-height: 1.25; }
+h1 { font-size: 1.9rem; border-bottom: 2px solid var(--rule); padding-bottom: 0.5rem; }
+h2 { font-size: 1.3rem; margin-top: 2.5rem; }
+p, li { font-size: 1.05rem; }
+.kicker { font-family: "Helvetica Neue", Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; color: var(--muted); }
+.lesson-nav { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+.lesson-nav a { color: var(--accent); }
+blockquote { border-left: 3px solid var(--accent); margin: 1.5rem 0; padding: 0.1rem 1rem; color: var(--muted); font-style: italic; }
+code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9rem; background: var(--code-bg); border-radius: 4px; }
+code { padding: 0.1rem 0.35rem; }
+pre { padding: 1rem 1.1rem; overflow-x: auto; border: 1px solid var(--rule); }
+pre code { padding: 0; background: none; }
+.callout { border: 1px solid var(--rule); border-left: 4px solid var(--accent); background: var(--code-bg); padding: 0.9rem 1.1rem; border-radius: 4px; margin: 1.5rem 0; }
+.sources { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; }
+.sources a { color: var(--accent); }
+table { border-collapse: collapse; width: 100%; margin: 1.5rem 0; font-size: 0.95rem; }
+th, td { border: 1px solid var(--rule); padding: 0.5rem 0.7rem; text-align: left; }
+th { background: var(--code-bg); font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.quiz { border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem 1.25rem 0.5rem; margin: 2rem 0; background: var(--code-bg); }
+.quiz h3 { margin-top: 0; font-size: 1.05rem; }
+.quiz-item { margin-bottom: 1.25rem; }
+.quiz-item p.q { font-weight: 600; margin-bottom: 0.4rem; }
+.quiz-item input[type="text"] { font-family: inherit; font-size: 1rem; width: 100%; max-width: 22rem; padding: 0.4rem 0.6rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); color: var(--ink); }
+.quiz-item button { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; margin-left: 0.5rem; padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.quiz-item .feedback { display: block; margin-top: 0.4rem; font-size: 0.9rem; font-family: "Helvetica Neue", Arial, sans-serif; }
+.feedback.correct { color: var(--ok); }
+.feedback.incorrect { color: var(--bad); }
+.footer-note { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; color: var(--muted); }
+@media print { body { max-width: none; padding: 0.5rem 1rem; } .quiz button { display: none; } }
+</style>
+</head>
+<body>
+
+<p class="lesson-nav">← <a href="#" onclick="history.back(); return false;">Lecciones</a> · HTTP y APIs</p>
+<p class="kicker">Lección 9</p>
+<h1>Idempotencia y reintentos: por qué un POST duplicado te puede romper todo</h1>
+
+<p>
+La Lección 1 ya nombraba la palabra "idempotencia" al lado de cada método,
+pero pasó de largo. Ahora que sabés armar una request completa (método +
+URL + headers + body), esto deja de ser trivia y se vuelve una decisión de
+diseño real: <strong>¿qué pasa si la misma request se ejecuta dos veces?</strong>
+</p>
+
+<blockquote>
+Idempotente = ejecutarla 1 vez o 10 veces produce <strong>el mismo estado final</strong>
+en el servidor. No significa "no hace nada", significa "no importa cuántas
+veces se repita por error".
+</blockquote>
+
+<h2>1. La tabla que tenés que memorizar</h2>
+
+<table>
+  <tr><th>Método</th><th>¿Idempotente?</th><th>Por qué</th></tr>
+  <tr><td><code>GET</code></td><td>Sí</td><td>Solo lee, nunca cambia nada.</td></tr>
+  <tr><td><code>PUT</code></td><td>Sí</td><td>Reemplaza el recurso entero por el mismo valor — repetirlo dos veces deja el mismo resultado que una.</td></tr>
+  <tr><td><code>DELETE</code></td><td>Sí</td><td>Borrar algo ya borrado no cambia nada (aunque la segunda vez te devuelva 404 en vez de 200).</td></tr>
+  <tr><td><code>PATCH</code></td><td>Depende</td><td>Si el cambio es <code>{"estado": "activo"}</code>, sí. Si es <code>{"cantidad": "+1"}</code> (incrementar), NO — cada repetición suma de nuevo.</td></tr>
+  <tr><td><code>POST</code></td><td><strong>No</strong></td><td>Por definición crea algo nuevo cada vez que se ejecuta. Dos POST = dos recursos creados.</td></tr>
+</table>
+
+<h2>2. El escenario real que te puede pasar en FastPass</h2>
+
+<p>
+n8n manda un <code>POST</code> para anotar a un pasajero en la lista de espera.
+La red falla justo cuando la respuesta vuelve (la request sí llegó y se
+procesó, pero la confirmación no). n8n interpreta "no hubo respuesta" y,
+si tiene un reintento automático configurado, <strong>manda el mismo POST de
+nuevo</strong>. Resultado: el pasajero queda anotado dos veces en la cola.
+</p>
+
+<div class="callout">
+Esto no es hipotético — es exactamente el motivo por el que las APIs de pago
+(Stripe, Mercado Pago) exigen un <strong>Idempotency-Key</strong> en el header de cada
+POST: un ID único que vos generás por operación, para que el servidor sepa
+"este POST ya lo procesé, aunque me llegue de nuevo, no lo repito". No toda
+API lo soporta, pero es el patrón estándar de la industria para resolver
+justo este problema.
+</div>
+
+<h2>3. Qué hacer cuando la API no tiene Idempotency-Key</h2>
+<ul>
+  <li><strong>No reintentar POSTs automáticamente</strong> sin verificar antes si ya se creó (ej. un GET que chequee "¿este pasajero ya está en la cola?").</li>
+  <li>Si podés elegir el diseño, preferir <code>PUT</code> sobre <code>POST</code> cuando el cliente puede generar el ID del recurso de antemano (ej. <code>PUT /pasajeros/{telefono}</code> en vez de <code>POST /pasajeros</code>) — así un reintento es inofensivo.</li>
+  <li>En n8n: revisar la config de <em>Retry On Fail</em> del HTTP Request node — está pensada para errores de red transitorios, no es gratis para un POST no protegido.</li>
+</ul>
+
+<h2>Quiz — recall activo</h2>
+<p>Escribí la respuesta antes de mostrarla. No hay pistas de formato: todas las respuestas correctas tienen longitud similar.</p>
+
+<div class="quiz">
+  <h3>Autoevaluación</h3>
+
+  <div class="quiz-item">
+    <p class="q">1. ¿Cuál de los 5 métodos NO es idempotente por definición?</p>
+    <input type="text" id="q1" placeholder="tu respuesta">
+    <button onclick="check('q1','fb1','post')">Revisar</button>
+    <span class="feedback" id="fb1"></span>
+  </div>
+
+  <div class="quiz-item">
+    <p class="q">2. Si reintentás un PUT que reemplaza el recurso completo dos veces, ¿el estado final cambia respecto a hacerlo una sola vez?</p>
+    <input type="text" id="q2" placeholder="tu respuesta (sí/no)">
+    <button onclick="check('q2','fb2','^no$')">Revisar</button>
+    <span class="feedback" id="fb2"></span>
+  </div>
+
+  <div class="quiz-item">
+    <p class="q">3. ¿Qué header usan APIs de pago para que un POST reintentado no se procese dos veces?</p>
+    <input type="text" id="q3" placeholder="tu respuesta (dos palabras)">
+    <button onclick="check('q3','fb3','idempotency.?key')">Revisar</button>
+    <span class="feedback" id="fb3"></span>
+  </div>
+</div>
+
+<p>
+Si algo no cerró, preguntame — esto conecta directo con cualquier
+configuración de <em>retry</em> que toques en n8n de ahora en más.
+</p>
+
+<p class="sources">
+Fuente primaria recomendada:
+<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Methods" target="_blank" rel="noopener">MDN — HTTP request methods</a>
+(columna de idempotencia en la tabla de cada método) ·
+<a href="https://stripe.com/docs/api/idempotent_requests" target="_blank" rel="noopener">Stripe Docs — Idempotent requests</a> (ejemplo real de Idempotency-Key).
+</p>
+
+<p class="footer-note">
+Lección 9 · HTTP y APIs · <a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a>
+</p>
+
+<script>
+function check(inputId, fbId, answerPattern) {
+  const val = document.getElementById(inputId).value.trim().toLowerCase();
+  const fb = document.getElementById(fbId);
+  const re = new RegExp(answerPattern, 'i');
+  if (re.test(val)) {
+    fb.textContent = 'Correcto.';
+    fb.className = 'feedback correct';
+  } else {
+    fb.textContent = 'No es eso — releé la sección 1 o 2 y probá de nuevo.';
+    fb.className = 'feedback incorrect';
+  }
+}
+</script>
+
+</body>
+</html>
