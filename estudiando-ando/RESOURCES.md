@@ -31,6 +31,8 @@
   API pública falsa para practicar POST/PUT/PATCH sin efectos reales. Use for: ejemplo aplicado de la Lección 7.
 - [GitHub Docs: Create an issue](https://docs.github.com/en/rest/issues/issues#create-an-issue)
   Ejemplo real de POST autenticado con body JSON. Use for: segundo ejemplo aplicado de la Lección 7, conecta con la Lección 5 (auth).
+- [MDN: URI — Query](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Query)
+  Sintaxis y semántica de la query string. Use for: fuente primaria de la Lección 8 — distinción path param / query param.
 
 ## Gaps
 

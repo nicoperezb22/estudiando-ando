@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lección 8 · Query params vs path params</title>
+<style>
+:root {
+  --ink: #1a1a1a; --paper: #fdfcf9; --muted: #6b6b6b; --rule: #ddd6c8;
+  --accent: #9a3324; --code-bg: #f2efe6; --ok: #2f6f4f; --bad: #9a3324;
+  --max-width: 42rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ece6d8; --paper: #1c1a16; --muted: #9c968a; --rule: #423e35;
+    --accent: #e0a08a; --code-bg: #2a271f; --ok: #7fbf9f; --bad: #e0a08a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  line-height: 1.6; max-width: var(--max-width); margin: 0 auto;
+  padding: 3rem 1.25rem 6rem;
+}
+h1, h2, h3 { font-family: inherit; font-weight: 600; line-height: 1.25; }
+h1 { font-size: 1.9rem; border-bottom: 2px solid var(--rule); padding-bottom: 0.5rem; }
+h2 { font-size: 1.3rem; margin-top: 2.5rem; }
+p, li { font-size: 1.05rem; }
+.kicker { font-family: "Helvetica Neue", Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; color: var(--muted); }
+.lesson-nav { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+.lesson-nav a { color: var(--accent); }
+blockquote { border-left: 3px solid var(--accent); margin: 1.5rem 0; padding: 0.1rem 1rem; color: var(--muted); font-style: italic; }
+code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9rem; background: var(--code-bg); border-radius: 4px; }
+code { padding: 0.1rem 0.35rem; }
+pre { padding: 1rem 1.1rem; overflow-x: auto; border: 1px solid var(--rule); }
+pre code { padding: 0; background: none; }
+.callout { border: 1px solid var(--rule); border-left: 4px solid var(--accent); background: var(--code-bg); padding: 0.9rem 1.1rem; border-radius: 4px; margin: 1.5rem 0; }
+.sources { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; }
+.sources a { color: var(--accent); }
+table { border-collapse: collapse; width: 100%; margin: 1.5rem 0; font-size: 0.95rem; }
+th, td { border: 1px solid var(--rule); padding: 0.5rem 0.7rem; text-align: left; }
+th { background: var(--code-bg); font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.quiz { border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem 1.25rem 0.5rem; margin: 2rem 0; background: var(--code-bg); }
+.quiz h3 { margin-top: 0; font-size: 1.05rem; }
+.quiz-item { margin-bottom: 1.25rem; }
+.quiz-item p.q { font-weight: 600; margin-bottom: 0.4rem; }
+.quiz-item input[type="text"] { font-family: inherit; font-size: 1rem; width: 100%; max-width: 22rem; padding: 0.4rem 0.6rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); color: var(--ink); }
+.quiz-item button { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; margin-left: 0.5rem; padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.quiz-item .feedback { display: block; margin-top: 0.4rem; font-size: 0.9rem; font-family: "Helvetica Neue", Arial, sans-serif; }
+.feedback.correct { color: var(--ok); }
+.feedback.incorrect { color: var(--bad); }
+.footer-note { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-family: "Helvetica Neue", Arial, sans-serif; font-size: 0.85rem; color: var(--muted); }
+@media print { body { max-width: none; padding: 0.5rem 1rem; } .quiz button { display: none; } }
+</style>
+</head>
+<body>
+
+<p class="lesson-nav">← <a href="#" onclick="history.back(); return false;">Lecciones</a> · HTTP y APIs</p>
+<p class="kicker">Lección 8</p>
+<h1>Query params vs path params: cómo se arma la URL</h1>
+
+<p>
+Ya viste método (L1), status code (L2), headers/auth (L3), body (L7) y
+paginación (L6). Falta la última pieza del rompecabezas de la request: la
+<strong>URL en sí</strong>. Hay dos formas distintas de meter datos ahí adentro, y
+confundirlas es un error común al armar el HTTP Request node en n8n.
+</p>
+
+<h2>1. Dos lugares, dos significados distintos</h2>
+
+<table>
+  <tr><th></th><th>Path param</th><th>Query param</th></tr>
+  <tr><td>Dónde va</td><td>Parte de la ruta: <code>/users/42</code></td><td>Después del <code>?</code>: <code>?page=2&per_page=50</code></td></tr>
+  <tr><td>Identifica</td><td><strong>Qué</strong> recurso — es obligatorio, sin él la ruta no tiene sentido</td><td><strong>Cómo</strong> se filtra/pagina/ordena ese recurso — casi siempre opcional</td></tr>
+  <tr><td>Ejemplo</td><td><code>GET /repos/octocat/hello-world</code></td><td><code>GET /repos/octocat/hello-world/issues?state=open&page=2</code></td></tr>
+</table>
+
+<blockquote>
+Prueba mental: si sacás el dato y la URL deja de tener sentido como ruta
+("un repo de quién?"), es <strong>path param</strong>. Si sacarlo simplemente
+te da el comportamiento por default (todos los issues, primera página),
+es <strong>query param</strong>.
+</blockquote>
+
+<h2>2. Caso real — GitHub API</h2>
+
+<pre><code>GET /repos/{owner}/{repo}/issues?state=open&labels=bug&page=2</code></pre>
+<ul>
+  <li><code>{owner}</code> y <code>{repo}</code> → path params. Sin ellos no sabés de qué repo hablás.</li>
+  <li><code>state</code>, <code>labels</code>, <code>page</code> → query params. Filtran y paginan (esto es exactamente lo que viste en la Lección 6).</li>
+</ul>
+
+<h2>3. Caso real — JSONPlaceholder (filtrar con query params)</h2>
+
+<pre><code>GET https://jsonplaceholder.typicode.com/posts?userId=1</code></pre>
+<p>
+Path param: nada, la ruta es fija (<code>/posts</code>). Query param: <code>userId=1</code>
+filtra el resultado — te devuelve solo los posts de ese usuario, en vez del
+listado completo.
+</p>
+
+<h2>4. Aplicado a n8n (tu caso real, FastPass)</h2>
+
+<div class="callout">
+En el <strong>HTTP Request node</strong>: el path param lo escribís directo en el
+campo <em>URL</em>, muchas veces con una expresión — <code>https://api.ejemplo.com/users/{{ $json.userId }}</code>.
+El query param va aparte, en la pestaña <em>Query Parameters</em> (mismo mecanismo
+que ya usaste sin saberlo si alguna vez pusiste <code>page</code> o <code>maxResults</code>
+ahí — Lección 6). n8n arma el <code>?clave=valor&clave2=valor2</code> por vos; no hace
+falta que lo escribas a mano en el campo URL.
+</div>
+
+<h2>Quiz — recall activo</h2>
+<p>Escribí la respuesta antes de mostrarla. No hay pistas de formato: todas las respuestas correctas tienen longitud similar.</p>
+
+<div class="quiz">
+  <h3>Autoevaluación</h3>
+
+  <div class="quiz-item">
+    <p class="q">1. En <code>/repos/octocat/hello-world/issues?state=open</code>, ¿qué tipo de param es <code>octocat</code>?</p>
+    <input type="text" id="q1" placeholder="tu respuesta">
+    <button onclick="check('q1','fb1','path')">Revisar</button>
+    <span class="feedback" id="fb1"></span>
+  </div>
+
+  <div class="quiz-item">
+    <p class="q">2. ¿Cuál de los dos es casi siempre opcional: path param o query param?</p>
+    <input type="text" id="q2" placeholder="tu respuesta">
+    <button onclick="check('q2','fb2','query')">Revisar</button>
+    <span class="feedback" id="fb2"></span>
+  </div>
+
+  <div class="quiz-item">
+    <p class="q">3. En n8n, ¿en qué pestaña del HTTP Request node configurás los query params (en vez de escribirlos a mano en la URL)?</p>
+    <input type="text" id="q3" placeholder="tu respuesta (dos palabras)">
+    <button onclick="check('q3','fb3','query parameters')">Revisar</button>
+    <span class="feedback" id="fb3"></span>
+  </div>
+</div>
+
+<p>
+Si algo no cerró, preguntame directamente — esta lección solo sirve si la
+podés aplicar la próxima vez que armes un HTTP Request node en n8n.
+</p>
+
+<p class="sources">
+Fuente primaria recomendada:
+<a href="https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Query" target="_blank" rel="noopener">MDN — URI: Query</a>.
+</p>
+
+<p class="footer-note">
+Lección 8 de 8 · HTTP y APIs · <a href="../MISSION.md">MISSION.md</a> · <a href="../RESOURCES.md">RESOURCES.md</a>
+</p>
+
+<script>
+function check(inputId, fbId, answerPattern) {
+  const val = document.getElementById(inputId).value.trim().toLowerCase();
+  const fb = document.getElementById(fbId);
+  const re = new RegExp(answerPattern, 'i');
+  if (re.test(val)) {
+    fb.textContent = 'Correcto.';
+    fb.className = 'feedback correct';
+  } else {
+    fb.textContent = 'No es eso — releé la sección 1 o 4 y probá de nuevo.';
+    fb.className = 'feedback incorrect';
+  }
+}
+</script>
+
+</body>
+</html>
